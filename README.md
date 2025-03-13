@@ -14,6 +14,25 @@ Explain how the useState hook is used in React to manage state within functional
 
 ### Response 2
 
+In order to give more control to rendering components, `useState` is one of many solutions that React came up with. What it does is that you can define variables using that same method which gives you access both to the value or reference itself in addition to a function that is meant to explicity dictate change that should accompany a re-render.
+
+The simplest example of `useState`'s application would be a counter (with its corresponding 'update' button). It would look something like this:
+
+```javascript
+function App({}) {
+  const [value, setValue] = useState(0);
+
+  return (
+    <div>
+      <h1>{value}</h1>
+      <button onClick={() => setValue(value+1)} />
+    </div>
+  )
+}
+```
+
+If `useState` was not used, the value would still be updated, but it will not reflect on the render! This is because React has special hooks (`useState` included) which signal components when they should do so. This makes it so that the user can be guaranteed that they are getting the 'freshest' information available.
+
 ## Prompt 3
 
 Describe the different ways the useEffect hook can be triggered in a React component. Include an explanation of how the dependency array influences its behavior. If possible, provide a code example for each scenario to illustrate your explanation.
@@ -46,3 +65,58 @@ const DogDisplay = () => {
 After fixing the code provide and explanation to what you fixed and why it needed to be fixed.
 
 ### Response 4
+
+The very first error is that `useEffect` is only allowed to return a function. This is implicit with the syntax, since any callback `() => {}` returns an anonymous function by default (unless it has a `return` statement inside). `useEffect` from a functional standpoint should never be asynchronous itself to prevent race conditions where it is a possibility that the component unmounts before `useEffect` finishes executing. Putting the `async` keyword to any function makes it so that it returns not just a regular `Function`, but an `AsyncFunction`.
+
+So let's fix that:
+
+```js
+  useEffect(() => { // made the callback synchronous by removing `async`
+    const fetchImg = async() => { // created an asynchronous function inside that is called immediately
+      try {
+        const response = await fetch('https://dog.ceo/api/breeds/image/random');
+        if (!response.ok) throw new Error(`Error: ${response.status}`)
+        const data = await response.json();
+        setImgSrc(data.message);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    fetchImg(); // the immediate call
+  }, []);
+}
+```
+
+There's nothing really functionally incorrect after that, but one improvement could be that `imgSrc` could be null or blank at the beginning, and only have the fallback render in case there's an error with the fetches. This implies a conditional loading render that we will render until the fetch completes. That entails these changes:
+
+```javascript
+const App = () => {
+  const [imgSrc, setImgSrc] = useState(null);
+  const [isLoading, setIsLoading] = useState(null); // a new load state invoke a re-render whenever it changes
+
+  useEffect(() => {
+    const fetchImg = async() => {
+      setIsLoading(true); // set loading to true while in the asynchronous function
+      try {
+        const response = await fetch('https://dog.ceo/api/breeds/image/random');
+        if (!response.ok) throw new Error(`Error: ${response.status}`)
+        const data = await response.json();
+        setImgSrc(data.message);
+      } catch (error) {
+        console.error(error);
+        setImgSrc('https://images.dog.ceo/breeds/hound-english/n02089973_612.jpg');
+      } finally {
+        setIsLoading(false); // finally, set isLoading to false to re-render the component
+      }
+    }
+    fetchImg();
+  }, []);
+
+  return (
+    <>
+      {/* We conditionally render either a loading message or the img once it's ready */}
+      { isLoading ? <h1>Loading...</h1> : <img src={imgSrc} /> }
+    </>
+  )
+}
+```
